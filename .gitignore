@@ -22,3 +22,10 @@ share/python-wheels/
 .installed.cfg
 *.egg
 MANIFEST
+
+# Môi trường ảo, checkpoint và dữ liệu (tải/tạo lại theo README)
+.venv/
+models/
+cache/
+data/fiq/*
+!data/fiq/missing.*.txt

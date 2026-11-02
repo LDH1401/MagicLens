@@ -134,6 +134,16 @@ class MagicLens(nn.Module):
     )
     return image_embs, text_embs
 
+  def encode_image(self, images: jax.Array) -> jax.Array:
+    """Computes CLIP image embeds [B, D] for images [B, H, W, 3] in [0, 1]."""
+    return self.clip.encode_image(
+        self._preprocess_images(images), normalize=False
+    )
+
+  def encode_text(self, ids: jax.Array) -> jax.Array:
+    """Computes CLIP text embeds [B, D] for text token ids [B, T]."""
+    return self.clip.encode_text(ids, normalize=False)
+
   def _normalize_embed(self, embed: jax.Array) -> jax.Array:
     """Applies normalization on the input embedding.
 
@@ -167,6 +177,20 @@ class MagicLens(nn.Module):
         * multimodal_embed_norm: [B, D], normalized multimodal embedding
     """
     img_embed, txt_embed = self.clip_encode(input_batch)  # [B, D], [B, D]
+    return self.fuse(img_embed, txt_embed)
+
+  def fuse(self, img_embed: jax.Array, txt_embed: jax.Array) -> Dict:
+    """Fuses CLIP image and text embeds into the multimodal embeddings.
+
+    Split out of __call__ so that the expensive CLIP embeds can be cached and
+    only this light-weight fusion re-run.
+
+    Args:
+      img_embed: [B, D]. CLIP image embeds (unnormalized).
+      txt_embed: [B, D]. CLIP text embeds (unnormalized).
+    Returns:
+      The same Dict as __call__.
+    """
     img_embed = img_embed.reshape(
         [-1, 1, img_embed.shape[-1]])  # [B, 1, D]
     txt_embed = txt_embed.reshape(

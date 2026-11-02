@@ -94,11 +94,34 @@ class Dataset:
         print("Results are written to file", output_file)
 
 
-def process_img(image_path: str, size: int) -> np.ndarray:
-    """Process a single image to 224x224 and normalize."""
+def process_img(image_path: str, size: int, mode: str = "original") -> np.ndarray:
+    """Process a single image to size x size with values in [0, 1].
+
+    mode:
+      original: divide by the image's own max and squash to a square
+        (upstream behaviour; distorts non-square images).
+      crop: divide by 255, centre-crop the largest square, then resize.
+      pad: divide by 255, pad to a square with white, then resize. Keeps the
+        aspect ratio and the whole object (FashionIQ has white backgrounds).
+    """
     img = Image.open(image_path).convert("RGB")
     ima = jnp.array(img)[jnp.newaxis, ...] # [1, 224, 224, 3]
-    ima = ima / (ima.max() + 1e-12)  # avoid 0 division
+    if mode == "original":
+        ima = ima / (ima.max() + 1e-12)  # avoid 0 division
+    else:
+        ima = ima / 255.0
+        h, w = ima.shape[1:3]
+        if mode == "crop":
+            s = min(h, w)
+            top, left = (h - s) // 2, (w - s) // 2
+            ima = ima[:, top:top + s, left:left + s, :]
+        elif mode == "pad":
+            s = max(h, w)
+            top, left = (s - h) // 2, (s - w) // 2
+            ima = jnp.pad(ima, ((0, 0), (top, s - h - top), (left, s - w - left), (0, 0)),
+                          constant_values=1.0)
+        else:
+            raise ValueError(f"Unknown preprocessing mode: {mode}")
     ima = jax.image.resize(ima, (1, size, size, 3), method='bilinear')
     return np.array(ima)
 
@@ -109,6 +132,18 @@ def build_fiq_dataset(dataset_name: str, tokenizer: Any) -> Dataset:
     queries = json.load(open(f"./data/fiq/captions/cap.{subtask}.val.json"))
     index_img_ids = json.load(open(f"./data/fiq/image_splits/split.{subtask}.val.json"))
     index_image_folder = "./data/fiq/images"
+
+    # Some original Amazon image links are dead (see download_fiq_images.py).
+    # Skip missing index images, and queries whose candidate or target is
+    # missing, since those queries could never be answered correctly.
+    def has_image(img_id):
+        return os.path.exists(os.path.join(index_image_folder, img_id + ".png"))
+
+    n_index, n_queries = len(index_img_ids), len(queries)
+    index_img_ids = [i for i in index_img_ids if has_image(i)]
+    queries = [q for q in queries if has_image(q['candidate']) and has_image(q['target'])]
+    print(f"Available images: {len(index_img_ids)}/{n_index} index images, "
+          f"{len(queries)}/{n_queries} queries kept.")
 
     null_tokens = tokenizer("")  # used for index example
     null_tokens = np.array(null_tokens)

@@ -18,6 +18,7 @@ from argparse import ArgumentParser
 import os
 import pickle
 from typing import Dict
+from clip.simple_tokenizer import default_bpe
 from data_utils import build_circo_dataset, build_fiq_dataset, build_dtin_dataset
 from flax import serialization
 import jax
@@ -80,7 +81,9 @@ if __name__ == "__main__":
   args = parser.parse_args()
 
   # init model
-  tokenizer = clip_tokenizer.build_tokenizer()
+  # Use the BPE vocab bundled with the `clip` package: without bpe_path,
+  # scenic re-downloads it from GitHub on every run, even when cached.
+  tokenizer = clip_tokenizer.build_tokenizer(bpe_path=default_bpe())
   model, model_params = load_model(args.model_size, args.model_path)
 
   # load data
