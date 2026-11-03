@@ -1,0 +1,17 @@
+{
+ "model": "Qwen/Qwen2-VL-2B-Instruct",
+ "prompt": "The first image shows a reference {cat}. The second image shows a candidate {cat}.\nRequested change to the reference {cat}: \"{text}\".\nDoes the candidate {cat} look like the reference {cat} after the requested change? Answer Yes or No.",
+ "top_k": 50,
+ "max_pixels": 200704,
+ "dtype": "float16",
+ "vision_cache": true,
+ "transformers": "4.57.6",
+ "candidates": {
+  "subtask": "dress",
+  "model_size": "base",
+  "seed": 0,
+  "top_k": 50,
+  "n_index": 3653,
+  "n_queries": 1861
+ }
+}

@@ -2,13 +2,15 @@
 
 Thư mục này là bản sao mã nguồn chính thức của **MagicLens**
 ([google-deepmind/magiclens](https://github.com/google-deepmind/magiclens), commit `5135f58`),
-viết bằng JAX/Flax. Bản sao này được dùng cho bài tập lớn môn Xử lý ảnh với ba mục tiêu:
+viết bằng JAX/Flax. Bản sao này được dùng cho bài tập lớn môn Xử lý ảnh với bốn mục tiêu:
 
 1. **Tái lập** kết quả của paper trên benchmark FashionIQ (tác vụ dress).
 2. **Phần A: thử ba cải tiến không cần huấn luyện** (tiền xử lý ảnh, cách viết truy vấn,
    rerank) và đánh giá chúng theo quy trình dev/test tách biệt (mục 7–8).
 3. **Phần B: tinh chỉnh khối hợp nhất** trên tập train của FashionIQ, giữ nguyên backbone
    CLIP, rồi đánh giá theo cùng quy trình (mục 9).
+4. **Phần C: rerank bằng mô hình VLM** (Qwen2-VL-2B) chạy trên Google Colab, vẫn giữ zero-shot
+   (mục 10).
 
 Paper: Kai Zhang và cộng sự, *MagicLens: Self-Supervised Image Retrieval with Open-Ended
 Instructions*, ICML 2024 ([arXiv:2403.19651](https://arxiv.org/abs/2403.19651),
@@ -22,6 +24,10 @@ Instructions*, ICML 2024 ([arXiv:2403.19651](https://arxiv.org/abs/2403.19651),
 - Phần B ([mục 9](#9-phần-b-tinh-chỉnh-khối-hợp-nhất-trên-fashioniq-train)): tinh chỉnh tăng
   R@10 trên test từ 23.3 lên 34.2 và R_avg từ 32.7 lên 46.0, tức **+13.3 điểm, khoảng tin cậy
   95% là [+11.2, +15.5]**. Đổi lại, mô hình không còn là zero-shot.
+- Phần C ([mục 10](#10-phần-c-rerank-bằng-vlm-qwen2-vl-trên-google-colab)): rerank top-50 bằng
+  Qwen2-VL-2B tăng R@10 trên test từ 23.3 lên 28.5, tức **+5.2 điểm, khoảng tin cậy 95% là
+  [+3.0, +7.2]** (R_avg 32.7 → 35.3), mà không huấn luyện mô hình nào trên FashionIQ. Đổi lại cần
+  thêm một VLM 2 tỉ tham số chạy trên GPU, khoảng 4.5 giây cho mỗi truy vấn.
 
 ---
 
@@ -57,7 +63,12 @@ khối hợp nhất trên FashionIQ, không thay thế quy trình huấn luyện
 | `download_fiq_images.py` | Tải ảnh FashionIQ từ đường dẫn Amazon gốc | Mới |
 | `fiq_experiments.py` | Phần A: thí nghiệm ba cải tiến không cần huấn luyện và ablation | Mới |
 | `fiq_finetune.py` | Phần B: tinh chỉnh khối hợp nhất trên tập train FashionIQ | Mới |
-| `docs/` | Paper gốc (`2403.19651v2.pdf`), bản tiếng Việt (`MagicLens_vn.pdf`) và báo cáo BTL (`BaoCao_MagicLens.docx`) | Mới |
+| `vlm_rerank_prepare.py` | Phần C: xuất top-50 của MagicLens và đóng gói `vlm_rerank/bundle.zip` cho Colab | Mới |
+| `vlm_rerank.py` | Phần C: chấm điểm từng cặp bằng VLM (PyTorch, chạy trên Colab, chạy tiếp được khi bị ngắt) | Mới |
+| `vlm_rerank_colab.ipynb` | Phần C: notebook Colab chạy từng bước | Mới |
+| `vlm_rerank_eval.py` | Phần C: trộn điểm VLM với MagicLens, chọn trên dev, báo cáo trên test | Mới |
+| `vlm_rerank/` | `candidates.json`, `bundle.zip` (không commit) và điểm VLM tải về từ Colab | Tự sinh |
+| `docs/` | Paper gốc (`2403.19651v2.pdf`) và [hướng dẫn Phần C](docs/huong_dan_vlm_rerank.md) | Mới |
 | `data/` | Dữ liệu benchmark (xem [data/README.md](data/README.md)) | |
 | `models/` | Checkpoint MagicLens | |
 | `cache/` | Embedding CLIP đã tính: tập val do `fiq_experiments.py` tạo, tập train do `fiq_finetune.py` tạo | Tự sinh |
@@ -312,10 +323,12 @@ khi baseline đạt 32.5. Vì vậy hai kỹ thuật này không được đưa 
   Câu mô tả của FIQ mang tính tương đối ("tối hơn", "ngắn hơn"), nên điểm văn bản → ảnh đứng
   riêng rất yếu (trọng số tối ưu trên dev bằng 0). Kết hợp hai điểm chỉ tăng nhẹ và không có
   ý nghĩa thống kê.
-- **Kết luận:** các thủ thuật zero-shot không cải thiện được MagicLens trên FashionIQ dress.
-  Dư địa vẫn còn lớn (R@10 khoảng 23 so với 51.8% nằm trong top-100), nhưng cần nguồn thông tin
-  mới. Phần B (mục 9) thử nguồn đó: tinh chỉnh riêng khối hợp nhất trên tập train của
-  FashionIQ; khi đó kết quả không còn là zero-shot.
+- **Kết luận:** ba thủ thuật zero-shot ở Phần A chỉ dùng thông tin sẵn có trong MagicLens và
+  CLIP, và không cải thiện được MagicLens trên FashionIQ dress. Dư địa vẫn còn lớn (R@10 khoảng
+  23 so với 51.8% nằm trong top-100), nhưng cần nguồn thông tin mới. Phần B (mục 9) lấy thông tin
+  đó từ dữ liệu có nhãn: tinh chỉnh riêng khối hợp nhất trên tập train của FashionIQ, nên kết quả
+  không còn là zero-shot. Phần C (mục 10) lấy thông tin đó từ một mô hình thị giác–ngôn ngữ bên
+  ngoài, không huấn luyện thêm mô hình nào, và tăng R@10 trên test 5.2 điểm (có ý nghĩa thống kê).
 
 ## 9. Phần B: tinh chỉnh khối hợp nhất trên FashionIQ train
 
@@ -442,7 +455,114 @@ Số in đậm là đỉnh của từng tốc độ học.
   trên nửa test của tập val, với kho thiếu 4.3% ảnh, nên không so khớp tuyệt đối được với số công
   bố của các phương pháp có giám sát trên FashionIQ.
 
-## 10. Kết quả gốc trên CIRCO (theo README chính thức)
+## 10. Phần C: rerank bằng VLM (Qwen2-VL) trên Google Colab
+
+Bộ rerank ở Phần A chỉ dùng điểm CLIP lấy từ chính backbone của MagicLens, nên không thêm thông tin
+mới. Phần C thay bằng mô hình thị giác–ngôn ngữ `Qwen/Qwen2-VL-2B-Instruct`. Mô hình này nhìn cùng lúc
+ảnh truy vấn, câu chỉ dẫn và ảnh ứng viên, rồi trả lời ảnh ứng viên có đúng là ảnh truy vấn sau khi sửa
+hay không. Điểm VLM là `logit("Yes") − logit("No")`. VLM không học gì trên FashionIQ, nên kết quả **vẫn
+là zero-shot** (xem lưu ý về cách gọi này ở mục 10.4).
+
+**Hướng dẫn chi tiết từng bước, tham số, xử lý sự cố và những gì đã kiểm thử:
+[docs/huong_dan_vlm_rerank.md](docs/huong_dan_vlm_rerank.md).**
+
+### 10.1. Phương pháp và cách chạy
+
+Tóm tắt quy trình:
+
+```bash
+# 1. Trên máy: xuất top-50 của MagicLens (1861 truy vấn × 50 = 93 050 cặp) và đóng gói ảnh
+.venv/bin/python vlm_rerank_prepare.py --subtask dress     # tạo vlm_rerank/bundle.zip (288 MB)
+# 2. Tải bundle.zip lên Google Drive, vào thư mục MyDrive/magiclens_vlm/
+# 3. Mở vlm_rerank_colab.ipynb trên Colab (GPU T4), chạy lần lượt các ô
+# 4. Tải vlm_scores.jsonl và vlm_scores.jsonl.meta.json về thư mục vlm_rerank/, rồi đánh giá:
+.venv/bin/python vlm_rerank_eval.py --scores vlm_rerank/vlm_scores.jsonl
+```
+
+- **Trộn điểm:** trên k ứng viên đầu, điểm mới là `z(MagicLens) + w · z(VLM)`, cùng kiểu chuẩn hóa với
+  rerank ở Phần A. Có thêm cấu hình "chỉ VLM".
+- **Chọn và báo cáo:** chọn k ∈ {20, 30, 50} và trọng số w theo R_avg của dev, báo cáo trên test, kèm
+  bootstrap ghép cặp so với baseline. Cách chia dev/test trùng với Phần A và B.
+- **Trần:** với k = 50, R@10 trên test tối đa đạt 42.1 (baseline 23.3). Rerank trong top-50 không đổi
+  tập top-50, nên R@50 giữ nguyên.
+- **Tăng tốc:** mỗi ảnh chỉ được mã hóa một lần (3612 ảnh khác nhau trong khoảng 186 nghìn lượt đưa
+  ảnh vào VLM).
+- Kết quả được ghi vào `output/fiq-dress-base_vlm_rerank.md` (các bảng của mục 10.2, thêm bảng R@10
+  trên toàn bộ lưới k × w) và `output/fiq-dress-base_vlm_rerank.json`.
+
+### 10.2. Kết quả
+
+Chấm 1861 truy vấn × 50 ứng viên = 93 050 cặp trên Colab, ở float16. Đánh giá trên cùng kho 3653 ảnh và
+cùng nửa test 931 truy vấn như Phần A và B. Cấu hình chọn trên dev là k = 50, w = 3.
+
+| Cấu hình | dev R_avg | test R@1 | test R@5 | test R@10 | test R@50 | test R_avg |
+|---|---|---|---|---|---|---|
+| MagicLens zero-shot (baseline) | 32.5 | 8.1 | 17.8 | 23.3 | 42.1 | 32.7 |
+| Chỉ VLM, rerank top-50 | 34.4 | 8.1 | 19.3 | 24.9 | 42.1 | 33.5 |
+| **Phần C: MagicLens + VLM, top-50 (w = 3)** | **35.5** | **10.8** | **21.7** | **28.5** | 42.1 | **35.3** |
+| Phần B: tinh chỉnh (để so sánh; không còn zero-shot) | 45.3 | 11.5 | 25.7 | 34.2 | 57.9 | 46.0 |
+
+- Chênh lệch so với baseline trên test (bootstrap ghép cặp 2000 lần, khoảng tin cậy 95%):
+  **R@10 +5.2 [+3.0, +7.2]** điểm. Khoảng nằm hẳn trên 0, nên mức tăng **có ý nghĩa thống kê**.
+  Ở 77 truy vấn test, ảnh đích được đưa vào top-10; ở 29 truy vấn, ảnh đích bị đẩy ra.
+- R@1 tăng 2.8 điểm (8.06 → 10.85) và R@5 tăng 3.9 điểm (17.83 → 21.70). R_avg tăng +2.6
+  [+1.5, +3.6], nhưng đây chỉ là mức tăng R@10 chia đôi: rerank trong top-50 không đổi tập top-50,
+  nên R@50 giữ nguyên ở mọi cấu hình.
+- **Một mình VLM chưa đủ:** so với baseline, "chỉ VLM" tăng R@10 +1.6 [−0.9, +4.2], khoảng tin cậy
+  chứa 0. Trộn với MagicLens tốt hơn hẳn dùng VLM một mình: +3.5 [+2.0, +5.0].
+- **Không phụ thuộc may rủi khi chọn tham số:** cả 30 cấu hình (k, w) trong lưới đều tăng R@10 trên
+  test, từ +0.4 đến +5.7 điểm. Với k = 50, mọi w từ 1 đến 5 cho R@10 test trong khoảng 28.0–29.0.
+
+Theo độ sâu rerank (w tốt nhất trên dev cho từng k):
+
+| k | w | Trần R@10 test | test R@10 | test R_avg |
+|---|---|---|---|---|
+| 20 | 1.5 | 30.6 | 27.4 | 34.7 |
+| 30 | 2 | 35.7 | 28.2 | 35.2 |
+| 50 | 3 | 42.1 | 28.5 | 35.3 |
+
+### 10.3. Thời gian chạy
+
+| Bước | Thời gian |
+|---|---|
+| `vlm_rerank_prepare.py` (máy, CPU) | khoảng 1–2 phút (đo được 49–126 giây), RAM tối đa khoảng 2.9 GB |
+| Chấm 93 050 cặp bằng VLM (Colab GPU, float16) | 2.3 giờ (8315 giây): trung bình 4.5 giây mỗi truy vấn, 89 ms mỗi cặp |
+| `vlm_rerank_eval.py` (máy) | khoảng 5 giây |
+
+Thời gian chấm là tổng thời gian của vòng lặp chấm điểm, gồm cả đọc ảnh, không gồm tải và nạp mô hình.
+Loại GPU không được ghi vào tệp kết quả; notebook yêu cầu chọn T4. Để so sánh, với mỗi truy vấn
+MagicLens chỉ cần mã hóa câu chỉ dẫn (khoảng 0.07 giây trên CPU, mục 8.7), chạy khối hợp nhất và nhân
+với embedding của kho ảnh đã tính sẵn.
+
+### 10.4. Nhận xét
+
+- **VLM đưa thêm thông tin mới, khác với rerank ở Phần A:** trên top-50 của các truy vấn test, điểm
+  VLM và điểm MagicLens gần như không tương quan (Pearson 0.15). Với các truy vấn test có ảnh đích trong top-50, khả năng tách
+  ảnh đích khỏi 49 ứng viên còn lại (AUC trung bình) là 0.74 với MagicLens, 0.78 với VLM và 0.81 khi
+  trộn. Hai mô hình sai ở những chỗ khác nhau, nên trộn tốt hơn từng mô hình riêng lẻ. Rerank ở Phần A
+  dùng lại điểm CLIP của chính backbone, nên không có lợi thế này.
+- **Mới khai thác được một phần trần:** với k = 50, R@10 tối đa là 42.1. Phần C lấy được 5.2 trong 18.8
+  điểm có thể lấy (khoảng 27%). VLM 2 tỉ tham số vẫn chấm sai nhiều: ở 29 truy vấn test, ảnh đích bị
+  đẩy ra khỏi top-10.
+- **Một phần nhỏ mức tăng đến từ việc đẩy ảnh truy vấn xuống.** Kho ảnh chứa cả ảnh truy vấn (giống code
+  gốc), và VLM đẩy ảnh này xuống: số truy vấn test có ảnh truy vấn trong top-10 giảm từ 31 xuống còn 5.
+  Nếu lọc ảnh truy vấn khỏi danh sách kết quả của cả hai hệ, mức tăng R@10 là +4.9 [+2.8, +7.0], vẫn có
+  ý nghĩa thống kê.
+- **So với Phần B:** Phần B tăng R_avg 13.3 điểm vì nâng được cả R@50 (42.1 → 57.9), điều mà rerank
+  trong top-50 không làm được. Xét riêng R@10, Phần B tăng +10.8 [+8.3, +13.3], Phần C tăng +5.2
+  [+3.0, +7.2]. Đổi lại, Phần C không
+  cần dữ liệu train có nhãn và không thay đổi MagicLens. Hai hướng có thể kết hợp (dùng VLM rerank kết quả
+  của mô hình đã tinh chỉnh), nhưng chưa được thử.
+- **Về cách gọi "zero-shot":** không mô hình nào được huấn luyện trên FashionIQ, nhưng nhãn của 930 truy
+  vấn dev được dùng để chọn k và w (giống Phần A). Đây là hệ hai mô hình, không phải MagicLens một mình.
+  Dữ liệu tiền huấn luyện của Qwen2-VL không được công bố đầy đủ, nên không loại trừ được việc mô hình đã
+  thấy ảnh sản phẩm giống FashionIQ.
+- **Kiểm chứng:** mọi con số trong `output/fiq-dress-base_vlm_rerank.json` (các bảng và phân tích ở mục
+  10.2 và 10.4) đã được tính lại bằng code viết riêng và khớp hoàn toàn. Đã kiểm tra rằng mỗi điểm VLM
+  gắn đúng với ứng viên của nó (xem mục 8 của
+  [hướng dẫn](docs/huong_dan_vlm_rerank.md#8-những-gì-đã-kiểm-thử-và-chưa-kiểm-thử)).
+
+## 11. Kết quả gốc trên CIRCO (theo README chính thức)
 
 Do chuyển đổi trọng số, kết quả của checkpoint công bố có thể chênh nhẹ so với paper:
 
@@ -457,7 +577,7 @@ Do chuyển đổi trọng số, kết quả của checkpoint công bố có th�
 Lệnh chạy: `python inference.py --model_size large --model_path ./models/magic_lens_clip_large.pkl --dataset circo`
 (cần rất nhiều RAM, xem mục 6).
 
-## 11. Trích dẫn
+## 12. Trích dẫn
 
 ```latex
 @inproceedings{zhang2024magiclens,
@@ -475,7 +595,7 @@ Lệnh chạy: `python inference.py --model_size large --model_path ./models/mag
 }
 ```
 
-## 12. Giấy phép
+## 13. Giấy phép
 
 Mã nguồn gốc thuộc bản quyền của DeepMind Technologies Limited (2024), phát hành theo giấy phép
 Apache 2.0; các tài liệu khác theo giấy phép CC-BY 4.0. Đây không phải sản phẩm chính thức của
