@@ -1,8 +1,6 @@
 # MagicLens: truy xuất ảnh với chỉ dẫn mở
 
-Thư mục này là bản sao mã nguồn chính thức của **MagicLens**
-([google-deepmind/magiclens](https://github.com/google-deepmind/magiclens), commit `5135f58`),
-viết bằng JAX/Flax. Bản sao này được dùng cho bài tập lớn môn Xử lý ảnh với bốn mục tiêu:
+Các phần chính:
 
 1. **Tái lập** kết quả của paper trên benchmark FashionIQ (tác vụ dress).
 2. **Phần A: thử ba cải tiến không cần huấn luyện** (tiền xử lý ảnh, cách viết truy vấn,
