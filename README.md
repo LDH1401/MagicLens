@@ -1,4 +1,4 @@
-# MagicLens: truy xuất ảnh với chỉ dẫn mở (bản thực nghiệm cho BTL Xử lý ảnh)
+# MagicLens: truy xuất ảnh với chỉ dẫn mở
 
 Thư mục này là bản sao mã nguồn chính thức của **MagicLens**
 ([google-deepmind/magiclens](https://github.com/google-deepmind/magiclens), commit `5135f58`),
@@ -57,6 +57,7 @@ khối hợp nhất trên FashionIQ, không thay thế quy trình huấn luyện
 | `download_fiq_images.py` | Tải ảnh FashionIQ từ đường dẫn Amazon gốc | Mới |
 | `fiq_experiments.py` | Phần A: thí nghiệm ba cải tiến không cần huấn luyện và ablation | Mới |
 | `fiq_finetune.py` | Phần B: tinh chỉnh khối hợp nhất trên tập train FashionIQ | Mới |
+| `docs/` | Paper gốc (`2403.19651v2.pdf`), bản tiếng Việt (`MagicLens_vn.pdf`) và báo cáo BTL (`BaoCao_MagicLens.docx`) | Mới |
 | `data/` | Dữ liệu benchmark (xem [data/README.md](data/README.md)) | |
 | `models/` | Checkpoint MagicLens | |
 | `cache/` | Embedding CLIP đã tính: tập val do `fiq_experiments.py` tạo, tập train do `fiq_finetune.py` tạo | Tự sinh |
